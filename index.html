@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="图书馆智能问答助手 - 快速解答借还书、开放时间、设备报修等问题">
+    <title>图书馆智能问答助手</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: #f9fafb;
+            min-height: 100vh;
+        }
+        
+        /* 头部样式 */
+        .header {
+            background: #2563eb;
+            color: white;
+            padding: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        
+        .header-content {
+            max-width: 1536px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        
+        .mode-toggle-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #1d4ed8;
+            border: none;
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .mode-toggle-btn:hover {
+            background: #1e40af;
+        }
+        
+        /* 主容器 */
+        .main-container {
+            height: calc(100vh - 72px);
+            overflow: hidden;
+        }
+        
+        /* 用户界面 */
+        .user-view {
+            max-width: 1024px;
+            margin: 0 auto;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+        }
+        
+        .welcome-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+        
+        .welcome-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .welcome-text {
+            color: #6b7280;
+            margin-bottom: 16px;
+        }
+        
+        .quick-questions-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            font-size: 14px;
+        }
+        
+        .quick-question-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #374151;
+        }
+        
+        .icon-blue {
+            color: #2563eb;
+        }
+        
+        /* 消息列表 */
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+        
+        .messages-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .message {
+            display: flex;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message.user {
+            justify-content: flex-end;
+        }
+        
+        .message-content {
+            max-width: 66.666667%;
+            padding: 16px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .message.user .message-content {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .message.bot .message-content {
+            background: white;
+        }
+        
+        .message-text {
+            white-space: pre-wrap;
+        }
+        
+        .feedback-link {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 8px 16px;
+            background: #2563eb;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: background 0.3s;
+        }
+        
+        .feedback-link:hover {
+            background: #1d4ed8;
+        }
+        
+        .message-time {
+            font-size: 12px;
+            margin-top: 8px;
+            opacity: 0.7;
+        }
+        
+        /* 输入框 */
+        .input-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            padding: 16px;
+        }
+        
+        .input-wrapper {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .message-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        .message-input:focus {
+            border-color: #2563eb;
+        }
+        
+        .send-button {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .send-button:hover {
+            background: #1d4ed8;
+        }
+        
+        /* 管理员界面 */
+        .admin-view {
+            max-width: 1536px;
+            margin: 0 auto;
+            padding: 24px;
+            overflow-y: auto;
+            height: 100%;
+        }
+        
+        .admin-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .admin-title {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 16px;
+        }
+        
+        .section {
+            margin-bottom: 24px;
+            padding: 16px;
+            border-radius: 8px;
+        }
+        
+        .section-blue {
+            background: #eff6ff;
+        }
+        
+        .section-green {
+            background: #f0fdf4;
+        }
+        
+        .section-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        
+        .section-description {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 12px;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+        }
+        
+        .file-input {
+            display: block;
+            width: 100%;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        .file-input::file-selector-button {
+            margin-right: 16px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+        }
+        
+        .file-input::file-selector-button:hover {
+            background: #1d4ed8;
+        }
+        
+        .form-input {
+            flex: 1;
+            padding: 8px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        .form-input:focus {
+            border-color: #2563eb;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .btn-green {
+            background: #16a34a;
+            color: white;
+        }
+        
+        .btn-green:hover {
+            background: #15803d;
+        }
+        
+        .btn-gray {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn-gray:hover {
+            background: #4b5563;
+        }
+        
+        .btn-red {
+            background: #dc2626;
+            color: white;
+        }
+        
+        .btn-red:hover {
+            background: #b91c1c;
+        }
+        
+        .knowledge-list-title {
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        
+        .knowledge-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            transition: box-shadow 0.3s;
+        }
+        
+        .knowledge-item:hover {
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        
+        .knowledge-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+        
+        .knowledge-title {
+            font-weight: 600;
+            font-size: 18px;
+        }
+        
+        .delete-btn {
+            color: #dc2626;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        
+        .delete-btn:hover {
+            color: #991b1b;
+        }
+        
+        .knowledge-keywords {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+        
+        .knowledge-answer {
+            font-size: 14px;
+            color: #374151;
+            white-space: pre-wrap;
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 4px;
+        }
+        
+        /* 图标 */
+        .icon {
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+        }
+        
+        .icon-lg {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .icon-xl {
+            width: 24px;
+            height: 24px;
+        }
+        
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .quick-questions-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .message-content {
+                max-width: 85%;
+            }
+            
+            .admin-view {
+                padding: 16px;
+            }
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 头部 -->
+    <header class="header">
+        <div class="header-content">
+            <div class="header-title">
+                <svg class="icon-xl" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                </svg>
+                <span>图书馆智能问答助手</span>
+            </div>
+            <button class="mode-toggle-btn" onclick="toggleMode()">
+                <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <span id="modeText">管理员模式</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主容器 -->
+    <main class="main-container">
+        <!-- 用户界面 -->
+        <div id="userView" class="user-view">
+            <!-- 欢迎卡片 -->
+            <div id="welcomeCard" class="welcome-card">
+                <h2 class="welcome-title">
+                    <svg class="icon-lg icon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    您好！我是图书馆智能助手
+                </h2>
+                <p class="welcome-text">我可以帮您解答以下问题：</p>
+                <div class="quick-questions-grid">
+                    <div class="quick-question-item">
+                        <svg class="icon icon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>开放时间</span>
+                    </div>
+                    <div class="quick-question-item">
+                        <svg class="icon icon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                        </svg>
+                        <span>借还书流程</span>
+                    </div>
+                    <div class="quick-question-item">
+                        <svg class="icon icon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        </svg>
+                        <span>设备报修</span>
+                    </div>
+                    <div class="quick-question-item">
+                        <svg class="icon icon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                        </svg>
+                        <span>座位预约</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 消息容器 -->
+            <div id="messagesContainer" class="messages-container hidden">
+                <div id="messagesList" class="messages-list"></div>
+            </div>
+
+            <!-- 输入框 -->
+            <div class="input-card">
+                <div class="input-wrapper">
+                    <input 
+                        type="text" 
+                        id="userInput" 
+                        class="message-input" 
+                        placeholder="请输入您的问题..."
+                        onkeypress="handleKeyPress(event)"
+                    >
+                    <button class="send-button" onclick="sendMessage()">
+                        <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                        </svg>
+                        <span>发送</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 管理员界面 -->
+        <div id="adminView" class="admin-view hidden">
+            <div class="admin-card">
+                <h2 class="admin-title">知识库管理</h2>
+                
+                <!-- 导入Excel -->
+                <div class="section section-blue">
+                    <h3 class="section-title">📊 导入Excel知识库</h3>
+                    <p class="section-description">
+                        Excel文件需包含三列：<strong>问题标题</strong>、<strong>关键词</strong>（用逗号分隔）、<strong>答案</strong>
+                    </p>
+                    <input 
+                        type="file" 
+                        id="excelFile" 
+                        class="file-input" 
+                        accept=".xlsx,.xls"
+                        onchange="handleExcelUpload(event)"
+                    >
+                </div>
+
+                <!-- 问卷链接设置 -->
+                <div class="section section-green">
+                    <h3 class="section-title">🔗 问卷链接设置</h3>
+                    <div class="button-group">
+                        <input 
+                            type="text" 
+                            id="formUrl" 
+                            class="form-input" 
+                            placeholder="输入问卷链接..."
+                        >
+                        <button class="btn btn-green" onclick="saveFormUrl()">
+                            <svg class="icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                            </svg>
+                            <span>保存</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+                    <button class="btn btn-gray" onclick="resetKnowledge()">
+                        重置为默认知识库
+                    </button>
+                </div>
+
+                <!-- 知识库列表 -->
+                <div>
+                    <h3 class="knowledge-list-title">当前知识库（<span id="knowledgeCount">0</span> 条）</h3>
+                    <div id="knowledgeList"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // 默认知识库
+        const defaultKnowledge = [
+            {
+                question: "图书馆开放时间",
+                keywords: ["开放时间", "营业时间", "几点开门", "几点关门", "开馆", "闭馆", "什么时候开"],
+                answer: "图书馆开放时间：\n周一至周五：8:00 - 22:00\n周六至周日：9:00 - 18:00\n法定节假日：9:00 - 17:00"
+            },
+            {
+                question: "借书流程",
+                keywords: ["借书", "怎么借", "借阅流程", "如何借书", "借阅"],
+                answer: "借书流程：\n1. 使用学生证或借书卡在自助借还机上刷卡\n2. 将图书放在扫描区\n3. 系统自动识别并办理借阅\n4. 打印借书凭条\n\n每人最多可借10本，借期30天"
+            },
+            {
+                question: "还书流程",
+                keywords: ["还书", "怎么还", "归还图书", "如何还书", "归还"],
+                answer: "还书流程：\n1. 在自助借还机上选择'还书'\n2. 将图书放在扫描区\n3. 系统确认后即完成归还\n\n24小时还书箱位置：图书馆一楼大厅东侧"
+            },
+            {
+                question: "设备故障报修",
+                keywords: ["报修", "设备坏了", "电脑故障", "打印机", "设备问题", "维修", "故障"],
+                answer: "设备故障报修方式：\n1. 现场报修：告知服务台工作人员\n2. 电话报修：010-12345678\n3. 在线报修：登录图书馆官网-服务-设备报修\n\n请说明设备位置、故障现象，我们会在2小时内响应"
+            },
+            {
+                question: "续借图书",
+                keywords: ["续借", "延期", "再借一次", "延长"],
+                answer: "续借方式：\n1. 登录图书馆官网个人中心\n2. 选择要续借的图书\n3. 点击'续借'按钮\n\n注意：每本书可续借2次，每次30天，到期前7天可续借"
+            },
+            {
+                question: "座位预约",
+                keywords: ["预约座位", "占座", "自习室", "座位", "预约"],
+                answer: "座位预约方法：\n1. 微信搜索'图书馆座位预约'小程序\n2. 选择日期和区域\n3. 选择座位并确认预约\n\n预约规则：提前1天可预约，每次最长4小时，超时15分钟自动释放"
+            }
+        ];
+
+        // 初始化
+        let knowledgeBase = [];
+        let formUrl = "https://forms.example.com/library-qa";
+        let currentMode = 'user';
+
+        function init() {
+            loadKnowledge();
+            loadFormUrl();
+            renderKnowledgeList();
+        }
+
+        function loadKnowledge() {
+            const saved = localStorage.getItem('library_knowledge');
+            knowledgeBase = saved ? JSON.parse(saved) : defaultKnowledge;
+            if (!saved) {
+                localStorage.setItem('library_knowledge', JSON.stringify(defaultKnowledge));
+            }
+        }
+
+        function saveKnowledge() {
+            localStorage.setItem('library_knowledge', JSON.stringify(knowledgeBase));
+            renderKnowledgeList();
+        }
+
+        function loadFormUrl() {
+            const saved = localStorage.getItem('form_url');
+            if (saved) {
+                formUrl = saved;
+            }
+            document.getElementById('formUrl').value = formUrl;
+        }
+
+        function saveFormUrl() {
+            formUrl = document.getElementById('formUrl').value;
+            localStorage.setItem('form_url', formUrl);
+            alert('✅ 问卷链接已保存');
+        }
+
+        function resetKnowledge() {
+            if (confirm('确定要重置为默认知识库吗？这将清除所有自定义内容。')) {
+                knowledgeBase = defaultKnowledge;
+                saveKnowledge();
+                alert('✅ 已重置为默认知识库');
+            }
+        }
+
+        function renderKnowledgeList() {
+            const list = document.getElementById('knowledgeList');
+            const count = document.getElementById('knowledgeCount');
+            count.textContent = knowledgeBase.length;
+            
+            if (knowledgeBase.length === 0) {
+                list.innerHTML = '<p style="text-align: center; color: #9ca3af;">暂无知识库</p>';
+                return;
+            }
+            
+            list.innerHTML = knowledgeBase.map((item, index) => `
+                <div class="knowledge-item">
+                    <div class="knowledge-header">
+                        <h4 class="knowledge-title">${item.question}</h4>
+                        <svg class="icon-lg delete-btn" onclick="deleteKnowledge(${index})" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </div>
+                    <p class="knowledge-keywords">
+                        <strong>关键词：</strong>${item.keywords.join('、')}
+                    </p>
+                    <div class="knowledge-answer">${item.answer}</div>
+                </div>
+            `).join('');
+        }
+
+        function deleteKnowledge(index) {
+            if (confirm('确定要删除这条知识吗？')) {
+                knowledgeBase.splice(index, 1);
+                saveKnowledge();
+            }
+        }
+
+        function handleExcelUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, {type: 'array'});
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+
+                    const newKnowledge = jsonData.map(row => ({
+                        question: row['问题标题'] || row['问题'] || '',
+                        keywords: (row['关键词'] || '').split(/[,，、]/).map(k => k.trim()).filter(k => k),
+                        answer: row['答案'] || row['回答'] || ''
+                    })).filter(item => item.question && item.answer && item.keywords.length > 0);
+
+                    if (newKnowledge.length === 0) {
+                        alert('❌ Excel格式不正确！\n请确保包含：问题标题、关键词、答案 三列');
+                        return;
+                    }
+
+                    newKnowledge.forEach(newItem => {
+                        const index = knowledgeBase.findIndex(item => item.question === newItem.question);
+                        if (index >= 0) {
+                            knowledgeBase[index] = newItem;
+                        } else {
+                            knowledgeBase.push(newItem);
+                        }
+                    });
+
+                    saveKnowledge();
+                    alert(`✅ 成功导入 ${newKnowledge.length} 条知识！\n当前知识库共 ${knowledgeBase.length} 条`);
+                } catch (error) {
+                    alert('❌ 导入失败，请检查Excel格式');
+                    console.error(error);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+            event.target.value = '';
+        }
+
+        function toggleMode() {
+            currentMode = currentMode === 'user' ? 'admin' : 'user';
+            const userView = document.getElementById('userView');
+            const adminView = document.getElementById('adminView');
+            const modeText = document.getElementById('modeText');
+
+            if (currentMode === 'admin') {
+                userView.classList.add('hidden');
+                adminView.classList.remove('hidden');
+                modeText.textContent = '用户模式';
+                renderKnowledgeList();
+            } else {
+                userView.classList.remove('hidden');
+                adminView.classList.add('hidden');
+                modeText.textContent = '管理员模式';
+            }
+        }
+
+        function findAnswer(userQuestion) {
+            const question = userQuestion.toLowerCase();
+            
+            for (let item of knowledgeBase) {
+                for (let keyword of item.keywords) {
+                    if (question.includes(keyword.toLowerCase())) {
+                        return {
+                            found: true,
+                            answer: item.answer,
+                            matchedQuestion: item.question
+                        };
+                    }
+                }
+            }
+            
+            return { found: false };
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('userInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const welcomeCard = document.getElementById('welcomeCard');
+            const messagesContainer = document.getElementById('messagesContainer');
+            const messagesList = document.getElementById('messagesList');
+
+            welcomeCard.classList.add('hidden');
+            messagesContainer.classList.remove('hidden');
+
+            const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            
+            // 用户消息
+            const userMessageHTML = `
+                <div class="message user">
+                    <div class="message-content">
+                        <div class="message-text">${text}</div>
+                        <div class="message-time">${time}</div>
+                    </div>
+                </div>
+            `;
+            messagesList.insertAdjacentHTML('beforeend', userMessageHTML);
+
+            input.value = '';
+
+            // 机器人回复
+            setTimeout(() => {
+                const result = findAnswer(text);
+                let botMessageHTML;
+                
+                if (result.found) {
+                    botMessageHTML = `
+                        <div class="message bot">
+                            <div class="message-content">
+                                <div class="message-text">${result.answer}</div>
+                                <div class="message-time">${time}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    botMessageHTML = `
+                        <div class="message bot">
+                            <div class="message-content">
+                                <div class="message-text">抱歉，我暂时无法回答这个问题。
+
+为了更好地帮助您，请点击下方链接填写问题详情，我们会尽快回复您：</div>
+                                <a href="${formUrl}" target="_blank" rel="noopener noreferrer" class="feedback-link">
+                                    📝 填写问题反馈表
+                                </a>
+                                <div class="message-time">${time}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                messagesList.insertAdjacentHTML('beforeend', botMessageHTML);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }, 500);
+
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
